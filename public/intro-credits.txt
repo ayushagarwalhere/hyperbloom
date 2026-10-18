@@ -1,0 +1,14 @@
+Harborline opening journey
+
+Camera path and cloud choreography adapted from Atmos by ayushagarwalhere:
+https://github.com/ayushagarwalhere/atmos
+Original choreography reference: Mohit Virli
+https://github.com/mohitvirli/mohitvirli.github.io
+
+Residential Window by AleixoAlonso
+https://sketchfab.com/3d-models/residential-window-ae11104237314463a61251fd46ded4b4
+Creative Commons Attribution 4.0: https://creativecommons.org/licenses/by/4.0/
+Adaptation: animated window sash and handle.
+
+Cloud texture: pmndrs/drei-assets
+https://github.com/pmndrs/drei-assets

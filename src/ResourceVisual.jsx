@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -58,14 +58,11 @@ function makeWorld() {
       role = node.key;
       byKey[node.key] = null;
     } else {
-      // The surrounding pieces form a loose service network around the four primary routes.
+      // An outer ring keeps every satellite visible rather than occluding nodes in depth.
       const ordinal = index - MAIN_CELLS.filter((cell) => cell < index).length;
-      const angle = ordinal * 2.399963229728653;
-      const y = 1 - 2 * ((ordinal + 0.5) / 22);
-      const radius = 3.1 + random() * 0.9;
-      const ring = Math.sqrt(1 - y * y);
-      to = new THREE.Vector3(Math.cos(angle) * ring * radius, y * radius * 0.78, Math.sin(angle) * ring * radius);
-      scaleTo = 0.34 + random() * 0.12;
+      const angle = ordinal / 22 * Math.PI * 2;
+      to = new THREE.Vector3(Math.cos(angle) * 3.8, Math.sin(angle) * 2.6, Math.sin(angle * 3) * .14);
+      scaleTo = 0.66 + random() * 0.1;
       role = `route-${index}`;
     }
     const mesh = new THREE.Mesh(geometry, node?.key === 'start' ? centerMetal : metal);
@@ -124,89 +121,7 @@ function Environment() {
   return null;
 }
 
-function makeSmokeTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return new THREE.CanvasTexture(canvas);
-  for (let i = 0; i < 11; i += 1) {
-    const x = 38 + ((i * 47) % 56);
-    const y = 40 + ((i * 29) % 52);
-    const radius = 18 + ((i * 13) % 22);
-    const puff = ctx.createRadialGradient(x, y, 1, x, y, radius);
-    puff.addColorStop(0, 'rgba(255,255,255,0.17)');
-    puff.addColorStop(0.52, 'rgba(255,255,255,0.09)');
-    puff.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = puff;
-    ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-  }
-  return new THREE.CanvasTexture(canvas);
-}
-
-function SmokeField({ progress, weather, reducedMotion }) {
-  const group = useRef(null);
-  const texture = useMemo(makeSmokeTexture, []);
-  const clouds = useRef([]);
-  const particles = useRef(null);
-  if (!particles.current) {
-    particles.current = Array.from({ length: 26 }, (_, index) => ({
-      x: Math.sin(index * 13.7) * 3.9,
-      y: Math.cos(index * 4.3) * 2.7,
-      z: -2.5 - (index % 5) * 0.16,
-      scale: 1.25 + (index % 4) * 0.47,
-      phase: index * 0.41,
-    }));
-  }
-  useEffect(() => () => texture.dispose(), [texture]);
-  useFrame(({ clock }) => {
-    if (!group.current) return;
-    const p = progress.current || 0;
-    const time = reducedMotion ? 0 : clock.elapsedTime;
-    group.current.position.x = Math.sin(time * 0.05) * 0.28 + p * 0.42;
-    group.current.position.y = Math.sin(time * 0.035) * 0.12 + p * 0.26;
-    group.current.rotation.z = Math.sin(time * 0.025) * 0.018;
-    clouds.current.forEach((sprite, index) => {
-      if (!sprite) return;
-      const item = particles.current[index];
-      sprite.position.x = item.x + (reducedMotion ? 0 : Math.sin(time * 0.08 + item.phase) * 0.12);
-      sprite.position.y = item.y + (reducedMotion ? 0 : Math.cos(time * 0.045 + item.phase) * 0.1);
-      const material = sprite.material;
-      material.opacity = (weather === 'day' ? 0.24 : 0.34) * (0.7 + p * 0.3);
-    });
-  });
-  return <group ref={group}>
-    {particles.current.map((item, index) => <sprite key={index} ref={(node) => { clouds.current[index] = node; }} position={[item.x, item.y, item.z]} scale={[item.scale * 1.9, item.scale, 1]}>
-      <spriteMaterial map={texture} color={weather === 'day' ? '#e7c895' : '#8c9eae'} transparent opacity={weather === 'day' ? 0.24 : 0.34} depthWrite={false} />
-    </sprite>)}
-  </group>;
-}
-
-function JourneyWindow({ progress, weather }) {
-  const sash = useRef(null);
-  const tint = weather === 'day' ? '#ffd99a' : '#c0d0e0';
-  useFrame((state, delta) => {
-    if (!sash.current) return;
-    const p = progress.current || 0;
-    const target = -p * 1.08;
-    sash.current.rotation.y += (target - sash.current.rotation.y) * (1 - Math.exp(-Math.min(delta, 0.05) * 5));
-    sash.current.position.x = -1.65 - p * 0.16;
-  });
-  const bar = (position, size, opacity = 0.22) => <mesh position={position}>
-    <boxGeometry args={size} />
-    <meshBasicMaterial color={tint} transparent opacity={opacity} depthWrite={false} />
-  </mesh>;
-  return <group position={[0, 0, -2.05]}>
-    {bar([0, 2.2, 0], [3.65, 0.045, 0.035])}{bar([0, -2.2, 0], [3.65, 0.045, 0.035])}
-    {bar([-1.8, 0, 0], [0.045, 4.45, 0.035])}{bar([1.8, 0, 0], [0.045, 4.45, 0.035])}
-    <group ref={sash} position={[-1.65, 0, 0]}>
-      {bar([0.82, 1.04, 0], [1.64, 0.035, 0.025], 0.16)}{bar([0.82, -1.04, 0], [1.64, 0.035, 0.025], 0.16)}
-      {bar([0, 0, 0], [0.035, 2.1, 0.025], 0.16)}{bar([1.64, 0, 0], [0.035, 2.1, 0.025], 0.16)}
-      {bar([0.82, 0, 0], [1.64, 0.025, 0.025], 0.12)}{bar([0.82, 0, 0], [0.025, 2.1, 0.025], 0.12)}
-    </group>
-  </group>;
-}
-
-function ResourceGraph({ control, reducedMotion, labels, scrollProgress, weather }) {
+function ResourceGraph({ control, reducedMotion, labels }) {
   const group = useRef(null);
   const world = useRef(null);
   const get = useThree((state) => state.get);
@@ -229,12 +144,7 @@ function ResourceGraph({ control, reducedMotion, labels, scrollProgress, weather
     const dt = Math.min(delta, 0.05);
     current.clock += dt;
     const t = current.clock;
-    const scroll = scrollProgress.current || 0;
-    if (Math.abs(scroll - control.current.lastScroll) > 0.002) {
-      control.current.manual = false;
-      control.current.lastScroll = scroll;
-    }
-    const target = control.current.manual ? (control.current.open ? 1 : 0) : scroll;
+    const target = control.current.open ? 1 : 0;
     current.amount = reducedMotion ? target : current.amount + (target - current.amount) * (1 - Math.exp(-dt * 2.6));
     if (Math.abs(target - current.amount) < 0.001) current.amount = target;
     current.hover += ((!control.current.open && control.current.hovering && !reducedMotion ? 1 : 0) - current.hover) * (1 - Math.exp(-dt * 8));
@@ -255,12 +165,18 @@ function ResourceGraph({ control, reducedMotion, labels, scrollProgress, weather
     });
 
     const open = smooth(current.amount);
-    current.root.scale.setScalar(THREE.MathUtils.lerp(1, 0.86, open));
-    const desiredY = (reducedMotion ? -0.58 : control.current.open ? Math.sin(t * 0.22) * 0.29 - 0.2 : t * 0.18 - 0.58) + state.pointer.x * 0.16 + control.current.drag.x;
-    const desiredX = (reducedMotion ? 0.32 : control.current.open ? Math.sin(t * 0.17) * 0.06 + 0.08 : 0.36) - state.pointer.y * 0.09 + control.current.drag.y;
+    current.root.scale.setScalar(1);
+    const vertical = THREE.MathUtils.lerp(1.85, 3.2, open);
+    const horizontal = THREE.MathUtils.lerp(1.85, 4.55, open);
+    const cameraDistance = Math.max(vertical, horizontal / state.camera.aspect) / Math.tan(THREE.MathUtils.degToRad(state.camera.fov / 2)) + 1.2;
+    state.camera.position.z = reducedMotion ? cameraDistance : THREE.MathUtils.damp(state.camera.position.z, cameraDistance, 5, dt);
+    state.camera.updateMatrixWorld();
+    const desiredY = (reducedMotion ? -0.2 : control.current.open ? Math.sin(t * 0.22) * 0.06 : t * 0.18 - 0.58) + state.pointer.x * 0.08 + (control.current.open ? THREE.MathUtils.clamp(control.current.drag.x, -.18, .18) : control.current.drag.x);
+    const desiredX = (reducedMotion ? 0.08 : control.current.open ? Math.sin(t * 0.17) * 0.06 + 0.08 : 0.36) - state.pointer.y * 0.09 + (control.current.open ? THREE.MathUtils.clamp(control.current.drag.y, -.12, .12) : control.current.drag.y);
     if (reducedMotion) current.root.rotation.set(desiredX, desiredY, 0);
     else {
-      current.root.rotation.y += (desiredY - current.root.rotation.y) * (1 - Math.exp(-dt * 3.5));
+      const yaw = desiredY - current.root.rotation.y;
+      current.root.rotation.y += Math.atan2(Math.sin(yaw), Math.cos(yaw)) * (1 - Math.exp(-dt * 3.5));
       current.root.rotation.x += (desiredX - current.root.rotation.x) * (1 - Math.exp(-dt * 3.5));
     }
     current.linkMaterial.opacity = 0.74 * open;
@@ -281,7 +197,7 @@ function ResourceGraph({ control, reducedMotion, labels, scrollProgress, weather
     });
   });
 
-  return <><SmokeField progress={scrollProgress} weather={weather} reducedMotion={reducedMotion} /><JourneyWindow progress={scrollProgress} weather={weather} /><group ref={group} /></>;
+  return <group ref={group} />;
 }
 
 function InvalidateOnChange({ open }) {
@@ -290,13 +206,20 @@ function InvalidateOnChange({ open }) {
   return null;
 }
 
-export default function ResourceVisual({ scrollProgress = { current: 0 }, weather = 'storm' }) {
+export default function ResourceVisual({ weather = 'storm' }) {
   const wrapper = useRef(null);
   const pointer = useRef(null);
-  const control = useRef({ open: false, manual: false, lastScroll: 0, hovering: false, drag: { x: 0, y: 0 } });
+  const control = useRef({ open: false, hovering: false, drag: { x: 0, y: 0 } });
   const labels = useRef({});
   const [open, setOpen] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
+    if (wrapper.current) observer.observe(wrapper.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -309,7 +232,6 @@ export default function ResourceVisual({ scrollProgress = { current: 0 }, weathe
   const toggle = () => {
     const next = !control.current.open;
     control.current.open = next;
-    control.current.manual = true;
     setOpen(next);
   };
 
@@ -340,12 +262,13 @@ export default function ResourceVisual({ scrollProgress = { current: 0 }, weathe
     onPointerUp={() => { if (pointer.current && !pointer.current.moved) toggle(); pointer.current = null; }}
     onPointerCancel={() => { pointer.current = null; }}
   >
-    <Canvas className="resource-canvas" dpr={[1, 1.4]} camera={{ position: [0, 0.25, 8.2], fov: 36 }} frameloop={reducedMotion ? 'demand' : 'always'} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}>
+    <Canvas className="resource-canvas" dpr={[1, 1.4]} camera={{ position: [0, 0.25, 8.2], fov: 36 }} frameloop={!visible ? 'never' : reducedMotion ? 'demand' : 'always'} gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}>
       <Environment />
       <ambientLight intensity={weather === 'day' ? 0.48 : 0.32} />
       <directionalLight position={[4, 6, 5]} intensity={weather === 'day' ? 2.1 : 1.75} color={weather === 'day' ? '#ffe0ac' : '#ffffff'} />
       <directionalLight position={[-6, 1, -5]} intensity={0.42} color={weather === 'day' ? '#f4b76e' : '#cbd4ff'} />
-      <ResourceGraph control={control} reducedMotion={reducedMotion} labels={labels} scrollProgress={scrollProgress} weather={weather} />
+      <directionalLight position={[0, -3, 5]} intensity={0.75} color="#e0e7ff" />
+      <ResourceGraph control={control} reducedMotion={reducedMotion} labels={labels} />
       {reducedMotion && <InvalidateOnChange open={open} />}
     </Canvas>
     <div className="resource-map-labels" aria-hidden="true">{MAIN.map((node) => label(node.key, node.label))}</div>

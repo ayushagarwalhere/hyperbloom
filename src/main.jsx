@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Assistant from './Assistant';
 const ResourceVisual = dynamic(() => import('./ResourceVisual'), { ssr: false, loading: () => <div className="scene-loading static-scene" aria-hidden="true" /> });
+const OpeningJourney = dynamic(() => import('./OpeningJourney'), { ssr: false, loading: () => <div className="opening-placeholder" /> });
 
 const resources = [
   { type: 'Shelter', title: 'Find an emergency shelter', distance: 'Official directory', detail: 'Search open shelters by ZIP code', meta: 'FEMA · Updated by local agencies', tone: 'violet', href: 'https://www.disasterassistance.gov/' },
@@ -32,7 +33,6 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [weatherMode, setWeatherMode] = useState('storm');
-  const heroProgress = useRef(0);
   const [location, setLocation] = useState('Choose a location');
   const [locationMessage, setLocationMessage] = useState('');
   const searchInput = useRef(null);
@@ -72,26 +72,6 @@ export default function App() {
     return () => observer.disconnect();
   }, [filtered]);
 
-  useEffect(() => {
-    const hero = document.querySelector('.hero');
-    if (!hero) return;
-    let frame = 0;
-    const update = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const rect = hero.getBoundingClientRect();
-        const range = Math.max(1, hero.offsetHeight - window.innerHeight * 0.25);
-        const progress = Math.max(0, Math.min(1, -rect.top / range));
-        heroProgress.current = progress;
-        hero.style.setProperty('--hero-scroll', progress.toFixed(3));
-      });
-    };
-    update();
-    window.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
-    return () => { cancelAnimationFrame(frame); window.removeEventListener('scroll', update); window.removeEventListener('resize', update); };
-  }, []);
-
   const locate = () => {
     setLocationMessage('');
     if (!navigator.geolocation) {
@@ -126,21 +106,19 @@ export default function App() {
       </header>
 
       <main id="top">
-        <section className="hero shell">
-          <div className="hero-atmosphere" aria-hidden="true"><i /><i /><i /><div className="weather-window"><span /><span /><span /><span /></div></div>
+        <OpeningJourney weather={weatherMode} onWeatherChange={setWeatherMode} />
+        <section className="hero cube-section shell" id="cube">
           <div className="hero-copy" data-reveal="up">
             <div className="hero-eyebrow-row"><div className="eyebrow"><span className="pulse" /> Trusted crisis resource guide</div><div className="weather-mode" aria-label="Choose a weather scene"><button type="button" className={weatherMode === 'day' ? 'selected' : ''} onClick={() => setWeatherMode('day')} aria-pressed={weatherMode === 'day'}><span>☼</span> Sunny day</button><button type="button" className={weatherMode === 'storm' ? 'selected' : ''} onClick={() => setWeatherMode('storm')} aria-pressed={weatherMode === 'storm'}><span>☾</span> Stormy night</button></div></div>
-            <h1>When things feel<br /><mark className="text-highlight">uncertain,</mark> start here.</h1>
+            <h2 className="cube-title">When things feel<br /><mark className="text-highlight">uncertain,</mark> start here.</h2>
             <p className="hero-subtitle">A calm, clear way to find trusted shelter, food support, emergency information, and someone to talk to — right when you need it.</p>
             <div className="hero-actions"><a className="button primary" href="#finder">Find help near me <Icon name="arrow" /></a><button className="button ghost" onClick={locate}><Icon name="pin" /> {location}</button></div>
             <div className="trust-line"><span>Start with trusted national directories</span><span className="trust-avatars"><i>F</i><i>9</i><i>N</i></span><span>Confirm local details before you travel</span></div>
-            <a className="scroll-through-hint" href="#finder"><span /> Scroll through the window</a>
           </div>
           <div className="hero-art" data-reveal="up" style={{ '--reveal-delay': '120ms' }}>
-            <ResourceVisual scrollProgress={heroProgress} weather={weatherMode} />
-            <div className="float-card weather-card"><span className="mini-icon orange">!</span><div><strong>Check local alerts</strong><small>Official updates · National Weather Service</small></div><span className="card-arrow">↗</span></div>
-            <div className="float-card quote-card"><span className="quote-mark">“</span><p>You don’t have to<br />figure this out alone.</p></div>
+            <ResourceVisual weather={weatherMode} />
           </div>
+          <p className="cube-caption">27 individual pieces. One connected support network.<br /><span>Click to expand. Drag to explore.</span></p>
         </section>
 
         <section className="finder shell" id="finder">
